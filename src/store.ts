@@ -3468,7 +3468,7 @@ export function matchFilesByGlob(db: Database, pattern: string): { filepath: str
   const allFiles = db.prepare(`
     SELECT
       'qmd://' || d.collection || '/' || d.path as virtual_path,
-      LENGTH(content.doc) as body_length,
+      LENGTH(CAST(content.doc AS BLOB)) as body_length,
       d.path,
       d.collection
     FROM documents d
@@ -4160,7 +4160,7 @@ export function searchFTS(db: Database, query: string, limit: number = 20, colle
       docid: getDocid(row.hash),
       collectionName,
       modifiedAt: "",  // Not available in FTS query
-      bodyLength: row.body.length,
+      bodyLength: Buffer.byteLength(row.body, "utf-8"),
       body: row.body,
       context: getContextForFile(db, row.filepath),
       metadata: parseMetadataJson(row.metadata_json),
@@ -4372,7 +4372,7 @@ export async function searchVec(db: Database, query: string, model: string, limi
         docid: getDocid(row.hash),
         collectionName,
         modifiedAt: "",  // Not available in vec query
-        bodyLength: row.body.length,
+        bodyLength: Buffer.byteLength(row.body, "utf-8"),
         body: row.body,
         context: getContextForFile(db, row.filepath),
         metadata: parseMetadataJson(row.metadata_json),
@@ -4880,7 +4880,7 @@ export function findDocument(db: Database, filename: string, options: { includeB
     d.hash,
     d.collection,
     d.modified_at,
-    LENGTH(content.doc) as body_length
+    LENGTH(CAST(content.doc AS BLOB)) as body_length
     ${bodyCol}
   `;
 
@@ -5039,7 +5039,7 @@ function commaListSelect(db: Database, whereSql: string, params: string[]): Comm
       d.collection,
       d.path,
       'qmd://' || d.collection || '/' || d.path as virtual_path,
-      LENGTH(content.doc) as body_length
+      LENGTH(CAST(content.doc AS BLOB)) as body_length
     FROM documents d
     JOIN content ON content.hash = d.hash
     WHERE d.active = 1 AND (${whereSql})
@@ -5150,7 +5150,7 @@ export function findDocuments(
     d.hash,
     d.collection,
     d.modified_at,
-    LENGTH(content.doc) as body_length
+    LENGTH(CAST(content.doc AS BLOB)) as body_length
     ${bodyCol}
   `;
 
