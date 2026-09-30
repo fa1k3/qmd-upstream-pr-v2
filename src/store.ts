@@ -4117,6 +4117,7 @@ export function searchFTS(db: Database, query: string, limit: number = 20, colle
       d.collection || '/' || d.path as display_path,
       d.title,
       content.doc as body,
+      LENGTH(CAST(content.doc AS BLOB)) as body_length,
       d.hash,
       fm.bm25_score,
       dm.metadata_json
@@ -4144,7 +4145,7 @@ export function searchFTS(db: Database, query: string, limit: number = 20, colle
   sql += ` ORDER BY fm.bm25_score ASC LIMIT ?`;
   params.push(limit);
 
-  const rows = db.prepare(sql).all(...params) as { filepath: string; display_path: string; title: string; body: string; hash: string; bm25_score: number; metadata_json: string | null }[];
+  const rows = db.prepare(sql).all(...params) as { filepath: string; display_path: string; title: string; body: string; body_length: number; hash: string; bm25_score: number; metadata_json: string | null }[];
   return rows.map(row => {
     const collectionName = row.filepath.split('//')[1]?.split('/')[0] || "";
     // Convert bm25 (negative, lower is better) into a stable [0..1) score where higher is better.
@@ -4160,7 +4161,7 @@ export function searchFTS(db: Database, query: string, limit: number = 20, colle
       docid: getDocid(row.hash),
       collectionName,
       modifiedAt: "",  // Not available in FTS query
-      bodyLength: Buffer.byteLength(row.body, "utf-8"),
+      bodyLength: row.body_length,
       body: row.body,
       context: getContextForFile(db, row.filepath),
       metadata: parseMetadataJson(row.metadata_json),
@@ -4322,6 +4323,7 @@ export async function searchVec(db: Database, query: string, model: string, limi
       d.collection || '/' || d.path as display_path,
       d.title,
       content.doc as body,
+      LENGTH(CAST(content.doc AS BLOB)) as body_length,
       dm.metadata_json
     FROM content_vectors cv
     JOIN documents d ON d.hash = cv.hash AND d.active = 1
@@ -4346,7 +4348,7 @@ export async function searchVec(db: Database, query: string, model: string, limi
 
   const docRows = withLazyContentVectorMigration(db, () => db.prepare(docSql).all(...params) as {
     hash_seq: string; hash: string; pos: number; filepath: string;
-    display_path: string; title: string; body: string; metadata_json: string | null;
+    display_path: string; title: string; body: string; body_length: number; metadata_json: string | null;
   }[]);
 
   // Combine with distances and dedupe by filepath
@@ -4372,7 +4374,7 @@ export async function searchVec(db: Database, query: string, model: string, limi
         docid: getDocid(row.hash),
         collectionName,
         modifiedAt: "",  // Not available in vec query
-        bodyLength: Buffer.byteLength(row.body, "utf-8"),
+        bodyLength: row.body_length,
         body: row.body,
         context: getContextForFile(db, row.filepath),
         metadata: parseMetadataJson(row.metadata_json),
